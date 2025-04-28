@@ -25,24 +25,30 @@ class PuppetDBNodes():
 
     def destroy_krb_ticket(self):
         subprocess.call(['kdestroy'])
-
-
+    
     def get_facts_puppetdb(self, apiurl, facts, hostgroup):
-        url ='%s/facts' % apiurl
+        url = f'{apiurl}/inventory'
+        
+        # Build the query
         if 'v3' in apiurl:
-            query_base = '["and",["or",%s],["in", "certname", ["extract", "certname", ["select-facts", ["and", ["=", "name", "hostgroup"], ["~", "value", "%s"]]]]]]'
+            query_base = '["and", ["~", ["fact", "hostgroup"], "%s"]]'
         else:
-            query_base = '["and",["or",%s],["in", "certname", ["extract", "certname", ["select_facts", ["and", ["=", "name", "hostgroup"], ["~", "value", "%s"]]]]]]'
-        query_facts = ','.join(['["=","name","%s"]' % fact for fact in facts])
-        query = query_base % (query_facts, hostgroup)
+            query_base = '["and", ["~", ["fact", "hostgroup"], "%s"]]'
+        
+        query = query_base % hostgroup
 
-        headers = {'Content-Type': 'application/json','Accept': 'application/json, version=2'}
-        payload = {'query': query}
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, version=2'
+        }
+        payload = {
+            'query': query,
+            'facts': facts  # inventory allows you to specify facts to extract
+        }
 
-        logging.info("Getting facts from '%s', query: '%s'", url, query)
+        logging.info("Getting inventory from '%s', query: '%s'", url, query)
         r = requests.get(url, params=payload, headers=headers, auth=HTTPKerberosAuth())
 
-        # pylint: disable=no-member
         if r.status_code == requests.codes.ok:
             logging.info("Request code: '%s'", r.status_code)
             return json.loads(r.text)
